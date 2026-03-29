@@ -1,0 +1,375 @@
+.TH COMPILE-VA-MODELS 1 "March 2026" "IHP macOS Toolkit" "User Commands"
+.SH NAME
+compile-va-models.sh \- Compile Verilog-A models to OSDI format
+.SH SYNOPSIS
+.B compile-va-models.sh
+[\fB\-\-pdk\-root\fR \fIpath\fR]
+[\fB\-\-force\fR]
+.SH DESCRIPTION
+.B compile-va-models.sh
+compiles Verilog-A (.va) device models to OSDI (.osdi) format for use
+with ngspice.
+
+The script uses OpenVAF inside Docker to perform compilation, automatically
+discovering all .va files in the PDK and compiling them if .osdi versions
+don't exist or are outdated.
+.SH WHY COMPILATION IS NEEDED
+Verilog-A models (.va files) are source code that must be compiled before
+ngspice can use them:
+.PP
+.TS
+tab(|);
+l l l.
+Format|Type|Usage
+_
+.va|Source code|Human-readable model
+.osdi|Compiled binary|Loaded by ngspice
+.EE
+.PP
+The IHP SG13G2 PDK includes important Verilog-A models:
+.RS 4
+.IP \(bu 2
+PSP103 (MOSFET model)
+.IP \(bu 2
+HICUM Level 2 (HBT/BJT model)
+.IP \(bu 2
+Various device models
+.RE
+.PP
+Without compilation, these models cannot be used in simulations.
+.SH OPTIONS
+.TP
+.BI \-\-pdk\-root " path"
+Specify PDK root directory explicitly.
+If not provided, uses $PDK_ROOT environment variable.
+.TP
+.B \-\-force
+Force recompilation even if .osdi files exist and are newer than .va sources.
+.SH PREREQUISITES
+.SS Environment
+.PP
+.in +4n
+.EX
+# Configure environment first
+source $ASIC_DESIGN_ROOT/projets/env/zshrc_elec
+
+# Verify
+echo $PDK_ROOT
+.EE
+.in
+.SS Docker
+Docker Desktop must be running:
+.PP
+.in +4n
+.EX
+docker info
+.EE
+.in
+.SS PDK Installed
+IHP-Open-PDK must be present:
+.PP
+.in +4n
+.EX
+ls $PDK_ROOT/ihp-sg13g2/libs.tech/verilog-a/
+.EE
+.in
+.SH USAGE
+.SS Basic Usage
+.PP
+.in +4n
+.EX
+compile-va-models.sh
+.EE
+.in
+.PP
+Compiles all .va models found in $PDK_ROOT.
+.SS Specify PDK Path
+.PP
+.in +4n
+.EX
+compile-va-models.sh --pdk-root /path/to/IHP-Open-PDK
+.EE
+.in
+.SS Force Recompilation
+.PP
+.in +4n
+.EX
+compile-va-models.sh --force
+.EE
+.in
+.PP
+Useful after PDK updates or OpenVAF version changes.
+.SH WHAT IT DOES
+.SS Discovery Phase
+.RS 4
+.IP 1. 3
+Searches for .va files in $PDK_ROOT/ihp-sg13g2/libs.tech/verilog-a/
+.IP 2.
+Lists all found models
+.IP 3.
+Checks for existing .osdi files
+.RE
+.SS Compilation Phase
+For each .va file:
+.RS 4
+.IP 1. 3
+Checks if .osdi exists and is newer
+.IP 2.
+Skips if up-to-date (unless --force)
+.IP 3.
+Compiles using OpenVAF in Docker
+.IP 4.
+Verifies .osdi was created
+.IP 5.
+Reports success or failure
+.RE
+.SS Summary
+.RS 4
+.IP \(bu 2
+Total models found
+.IP \(bu 2
+Models compiled
+.IP \(bu 2
+Models skipped (up-to-date)
+.IP \(bu 2
+Compilation failures
+.RE
+.SH OUTPUT
+.SS Successful Compilation
+.PP
+.in +4n
+.EX
+=== Verilog-A Model Compilation ===
+
+PDK: /Users/you/Electronics/outils/IHP-Open-PDK
+Target: ihp-sg13g2
+
+Discovering Verilog-A models...
+Found 3 models:
+  - psp103/psp103_nqs.va
+  - hicuml2/hicumL2V2p4p0_release.va
+  - bjt/bjt504t.va
+
+Compiling models...
+
+[1/3] psp103_nqs.va
+  ✓ Compiled successfully
+  → psp103_nqs.osdi
+
+[2/3] hicumL2V2p4p0_release.va
+  ↻ Skipping (up-to-date)
+
+[3/3] bjt504t.va
+  ✓ Compiled successfully
+  → bjt504t.osdi
+
+Summary:
+  Total:    3 models
+  Compiled: 2 models
+  Skipped:  1 model
+  Failed:   0 models
+
+✓ Compilation complete
+.EE
+.in
+.SH EXIT STATUS
+.TP
+.B 0
+All compilations successful (or skipped if up-to-date)
+.TP
+.B 1
+One or more compilations failed
+.TP
+.B 2
+Environment error (PDK_ROOT not set, Docker not running)
+.SH WHEN TO RUN
+Run compilation:
+.RS 4
+.IP \(bu 2
+After initial PDK installation
+.IP \(bu 2
+After PDK updates (git pull)
+.IP \(bu 2
+If .osdi files are missing or corrupted
+.IP \(bu 2
+After Docker image updates (new OpenVAF version)
+.RE
+.PP
+Typically, compilation is needed only once after PDK installation.
+.SH COMPILATION TIME
+Typical compilation times per model:
+.PP
+.TS
+tab(|);
+l l.
+Model|Time
+_
+PSP103 (MOSFET)|30-60 seconds
+HICUM L2 (HBT)|60-120 seconds
+Simple models|10-30 seconds
+.TE
+.PP
+Total compilation time for IHP SG13G2: ~2-5 minutes.
+.SH TROUBLESHOOTING
+.SS Docker not running
+.PP
+.B Error:
+Cannot connect to Docker daemon
+.PP
+.B Fix:
+.PP
+.in +4n
+.EX
+# Launch Docker Desktop and wait
+docker info
+.EE
+.in
+.SS PDK_ROOT not set
+.PP
+.B Error:
+PDK_ROOT environment variable not set
+.PP
+.B Fix:
+.PP
+.in +4n
+.EX
+source $ASIC_DESIGN_ROOT/projets/env/zshrc_elec
+.EE
+.in
+.PP
+Or use --pdk-root flag.
+.SS Compilation fails
+.PP
+.B Symptoms:
+.RS 4
+.IP \(bu 2
+Error messages from OpenVAF
+.IP \(bu 2
+.osdi file not created
+.IP \(bu 2
+Parser errors in .va file
+.RE
+.PP
+.B Possible causes:
+.RS 4
+.IP \(bu 2
+Corrupted .va file
+.IP \(bu 2
+OpenVAF version incompatibility
+.IP \(bu 2
+Verilog-A syntax errors
+.RE
+.PP
+.B Fix:
+.RS 4
+.IP 1. 3
+Try --force to recompile
+.IP 2.
+Update Docker image:
+.B docker pull hpretl/iic-osic-tools:latest
+.IP 3.
+Check PDK integrity:
+.B git status
+in PDK directory
+.IP 4.
+Report issue if .va file is from official PDK
+.RE
+.SS Permission denied
+.PP
+.B Error:
+Cannot write .osdi file
+.PP
+.B Fix:
+Check write permissions on PDK directory:
+.PP
+.in +4n
+.EX
+ls -la $PDK_ROOT/ihp-sg13g2/libs.tech/verilog-a/
+.EE
+.in
+.SS Models not found in simulation
+.PP
+After successful compilation, if ngspice still cannot find models:
+.PP
+.in +4n
+.EX
+# Verify .osdi files exist
+find $PDK_ROOT -name "*.osdi"
+
+# Check netlist uses correct paths
+# Should use: /pdk/ihp-sg13g2/libs.tech/verilog-a/...
+.EE
+.in
+.SH COMPILED OUTPUT LOCATION
+.PP
+.osdi files are created in the same directory as their source .va files:
+.PP
+.in +4n
+.EX
+$PDK_ROOT/ihp-sg13g2/libs.tech/verilog-a/
+├── psp103/
+│   ├── psp103_nqs.va         (source)
+│   └── psp103_nqs.osdi       (compiled)
+├── hicuml2/
+│   ├── hicumL2V2p4p0_release.va
+│   └── hicumL2V2p4p0_release.osdi
+└── ...
+.EE
+.in
+.SH FILES
+.TP
+.I $TOOLKIT_ROOT/scripts/compile-va-models.sh
+The compilation script
+.TP
+.I $PDK_ROOT/ihp-sg13g2/libs.tech/verilog-a/
+Directory containing .va source files
+.TP
+.I $PDK_ROOT/ihp-sg13g2/libs.tech/verilog-a/*/*.osdi
+Compiled model files
+.SH ENVIRONMENT
+.TP
+.B PDK_ROOT
+Path to IHP-Open-PDK (required)
+.TP
+.B PDK
+PDK name, typically "ihp-sg13g2" (optional)
+.SH ADVANCED USAGE
+.SS Compile Specific Model
+.PP
+The script compiles all models. To compile one specific model manually:
+.PP
+.in +4n
+.EX
+cd $PDK_ROOT/ihp-sg13g2/libs.tech/verilog-a/psp103
+
+docker run --rm \\
+  -v "$PWD:/work" \\
+  -w /work \\
+  hpretl/iic-osic-tools:latest \\
+  openvaf psp103_nqs.va -o psp103_nqs.osdi
+.EE
+.in
+.SS Check OpenVAF Version
+.PP
+.in +4n
+.EX
+docker run --rm hpretl/iic-osic-tools:latest openvaf --version
+.EE
+.in
+.SH SEE ALSO
+.BR ngspice-docker (1),
+.BR docker (1)
+.PP
+.B OpenVAF documentation:
+.br
+https://openvaf.semimod.de/
+.PP
+.B IHP SG13G2 models:
+.br
+https://github.com/IHP-GmbH/IHP-Open-PDK
+.SH BUGS
+Report bugs to: https://github.com/YOUR-USERNAME/ihp-macos-toolkit/issues
+.SH AUTHORS
+Part of the ihp-macos-toolkit project.
+.SH COPYRIGHT
+See LICENSE file in the toolkit distribution.

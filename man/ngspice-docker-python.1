@@ -1,0 +1,275 @@
+.TH NGSPICE-DOCKER-PYTHON 1 "March 2026" "IHP macOS Toolkit" "User Commands"
+.SH NAME
+ngspice-docker-python \- Intelligent ngspice wrapper for Python integration
+.SH SYNOPSIS
+.B ngspice-docker-python
+[\fB\-b\fR]
+[\fB\-o\fR \fIlogfile\fR]
+.I netlist.sp
+.SH DESCRIPTION
+.B ngspice-docker-python
+is an enhanced wrapper around ngspice-docker that provides intelligent path
+translation for Python tools like mosplot and IHP-AnalogAcademy.
+
+Unlike the basic ngspice-docker wrapper, this version:
+.RS 4
+.IP \(bu 2
+Parses SPICE netlists to find path references
+.IP \(bu 2
+Automatically translates macOS paths to Docker container paths
+.IP \(bu 2
+Handles .include, .lib, pre_osdi, and write statements
+.IP \(bu 2
+Manages dynamic Docker volume mounts
+.IP \(bu 2
+Cleans up temporary files
+.RE
+.PP
+This wrapper is specifically designed for programmatic use by Python tools
+that generate netlists with absolute macOS paths.
+.SH PREREQUISITES
+Same as
+.BR ngspice-docker (1):
+.RS 4
+.IP \(bu 2
+Environment configured (source zshrc_elec)
+.IP \(bu 2
+Docker Desktop running
+.IP \(bu 2
+TOOLKIT_ROOT and PDK_ROOT set
+.RE
+.PP
+Additionally required for Python integration:
+.RS 4
+.IP \(bu 2
+Python 3.9+
+.IP \(bu 2
+Virtual environment with gmid/mosplot (optional)
+.RE
+.SH USAGE
+.SS From Command Line
+Same syntax as ngspice-docker:
+.PP
+.in +4n
+.EX
+ngspice-docker-python -b netlist.sp
+.EE
+.in
+.SS From Python (mosplot)
+The wrapper is automatically invoked by mosplot when configured:
+.PP
+.in +4n
+.EX
+from mosplot.lookup_table_generator.simulators import NgspiceSimulator
+
+ngspice = NgspiceSimulator(
+    simulator_path="ngspice-docker-python",
+    lib_mappings=[...],
+    ...
+)
+.EE
+.in
+.SS From Python (IHP-AnalogAcademy)
+Configure in academy scripts:
+.PP
+.in +4n
+.EX
+ngspice = NgspiceSimulator(
+    simulator_path="ngspice-docker-python",
+    ...
+)
+.EE
+.in
+.SH PATH TRANSLATION
+The wrapper intelligently translates paths in these SPICE statements:
+.TP
+.B .include
+.EX
+.include /Users/you/project/models.lib
+→ .include /work/models.lib
+.EE
+.TP
+.B .lib
+.EX
+.lib /Users/you/PDK/models.lib section
+→ .lib /pdk/models.lib section
+.EE
+.TP
+.B pre_osdi
+.EX
+pre_osdi /Users/you/models/device.osdi
+→ pre_osdi /pdk/models/device.osdi
+.EE
+.TP
+.B write
+.EX
+write /tmp/tmpXXX/output.txt
+→ write /work/tmp/tmpXXX/output.txt
+.EE
+.PP
+And handles -o flag:
+.EX
+ngspice-docker-python -o /tmp/log.txt netlist.sp
+→ mounts /tmp and translates path
+.EE
+.SH DYNAMIC VOLUME MOUNTS
+The wrapper analyzes the netlist and dynamically mounts only necessary volumes:
+.PP
+.TS
+tab(|);
+l l.
+Path Pattern|Mount Point
+_
+$PDK_ROOT/*|/pdk (read-only)
+$(pwd)/*|/work (read-write)
+/tmp/*|/tmp (read-write)
+$TMPDIR/*|Temporary mount
+.TE
+.PP
+This minimizes Docker overhead and security exposure.
+.SH TEMPORARY FILES
+The wrapper creates a modified netlist with translated paths:
+.PP
+.in +4n
+.EX
+/tmp/ngspice_XXXXXX.sp
+.EE
+.in
+.PP
+This file is automatically cleaned up after simulation, even if ngspice fails.
+.SH DIFFERENCES FROM NGSPICE-DOCKER
+.TS
+tab(|);
+l l l.
+Feature|ngspice-docker|ngspice-docker-python
+_
+Path translation|Basic|Intelligent parsing
+Volume mounts|Fixed|Dynamic
+Python integration|Manual|Automatic
+Netlist parsing|No|Yes
+Cleanup|Manual|Automatic
+Use case|Interactive|Programmatic
+.TE
+.SH EXAMPLES
+.SS Manual Use
+.PP
+.in +4n
+.EX
+# Works like ngspice-docker
+ngspice-docker-python -b circuit.sp
+.EE
+.in
+.SS With mosplot
+.PP
+.in +4n
+.EX
+# In your Python script
+ngspice = NgspiceSimulator(
+    simulator_path="ngspice-docker-python",
+    include_paths=[model_path],
+    ...
+)
+
+# mosplot generates netlists with macOS paths
+# Wrapper translates automatically
+lookup_table = generator.build("output")
+.EE
+.in
+.SS With IHP-AnalogAcademy
+.PP
+.in +4n
+.EX
+# In academy module scripts
+ngspice = NgspiceSimulator(
+    simulator_path="ngspice-docker-python",
+    lib_mappings=[(model_path, "mos_tt")],
+    ...
+)
+
+# Academy scripts work without modification
+.EE
+.in
+.SH TROUBLESHOOTING
+.SS Wrapper not found by Python
+.PP
+.in +4n
+.EX
+# Ensure toolkit is in PATH before activating venv
+source $ASIC_DESIGN_ROOT/projets/env/zshrc_elec
+source $ASIC_DESIGN_ROOT/outils/venv_ihp/bin/activate
+
+# Verify
+which ngspice-docker-python
+.EE
+.in
+.SS Path translation issues
+.PP
+Enable debug mode by editing the wrapper script:
+.PP
+.in +4n
+.EX
+# Add at top of wrapper
+set -x  # Enable bash debugging
+.EE
+.in
+.PP
+Then check stdout for path translations.
+.SS Docker volume errors
+.PP
+.in +4n
+.EX
+# Verify paths exist and are readable
+ls -la $PDK_ROOT
+ls -la $(pwd)
+
+# Check Docker has access
+docker run --rm -v "$PDK_ROOT:/pdk" alpine ls /pdk
+.EE
+.in
+.SS Temporary file not cleaned
+.PP
+.in +4n
+.EX
+# Manual cleanup if needed
+rm /tmp/ngspice_*.sp
+.EE
+.in
+.SH ENVIRONMENT
+Same as
+.BR ngspice-docker (1),
+plus:
+.TP
+.B TMPDIR
+Optional. Specifies temporary directory for intermediate files.
+If not set, uses /tmp.
+.SH FILES
+.TP
+.I $TOOLKIT_ROOT/scripts/ngspice-docker-python
+The wrapper script (Python-aware)
+.TP
+.I $TOOLKIT_ROOT/scripts/ngspice-docker
+Base wrapper (called internally)
+.TP
+.I /tmp/ngspice_*.sp
+Temporary netlists with translated paths (auto-cleanup)
+.SH PERFORMANCE
+The intelligent parsing adds ~50-100ms overhead compared to ngspice-docker.
+This is negligible for typical simulations (seconds to minutes).
+.SH SEE ALSO
+.BR ngspice-docker (1),
+.BR ngspice (1),
+.BR docker (1)
+.PP
+.B mosplot documentation:
+.br
+https://github.com/medwatt/gmid
+.PP
+.B IHP-AnalogAcademy:
+.br
+https://github.com/IHP-GmbH/IHP-AnalogAcademy
+.SH BUGS
+Report bugs to: https://github.com/YOUR-USERNAME/ihp-macos-toolkit/issues
+.SH AUTHORS
+Part of the ihp-macos-toolkit project.
+.SH COPYRIGHT
+See LICENSE file in the toolkit distribution.

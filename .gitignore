@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+*.egg-info/
+
+# SPICE
+*.log
+*.raw
+*.csv
+*.npz
+tmp*.sp
+results/
+
+# macOS
+.DS_Store
+
+# Editor
+*.swp
+*~
+
+# Misc
+*.tar.gz
+Trash/
+trash/
+tmp/
+Output/

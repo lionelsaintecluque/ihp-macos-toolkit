@@ -1,0 +1,242 @@
+.TH NGSPICE-DOCKER 1 "March 2026" "IHP macOS Toolkit" "User Commands"
+.SH NAME
+ngspice-docker \- Run ngspice with OSDI/Verilog-A support via Docker
+.SH SYNOPSIS
+.B ngspice-docker
+[\fB\-b\fR]
+[\fB\-o\fR \fIlogfile\fR]
+.I netlist.sp
+.SH DESCRIPTION
+.B ngspice-docker
+is a wrapper script that runs ngspice inside a Docker container to provide
+OSDI and Verilog-A model support on macOS, where native compilation is problematic.
+
+The script automatically translates macOS file paths to container paths and
+manages Docker volume mounts.
+.SH PREREQUISITES
+.SS Environment Configuration
+Before using
+.BR ngspice-docker ,
+ensure your shell environment is properly configured:
+.PP
+.in +4n
+.EX
+source $ASIC_DESIGN_ROOT/projets/env/zshrc_elec
+.EE
+.in
+.PP
+This loads:
+.RS 4
+.IP \(bu 2
+TOOLKIT_ROOT (path to ihp-macos-toolkit)
+.IP \(bu 2
+PDK_ROOT (path to IHP-Open-PDK)
+.IP \(bu 2
+PDK=ihp-sg13g2
+.IP \(bu 2
+Adds toolkit scripts to PATH
+.RE
+.PP
+Verify environment:
+.PP
+.in +4n
+.EX
+echo $TOOLKIT_ROOT
+which ngspice-docker
+.EE
+.in
+.SS Docker Desktop
+Docker must be running before executing
+.BR ngspice-docker .
+.PP
+.B Check Docker status:
+.PP
+.in +4n
+.EX
+docker info
+.EE
+.in
+.PP
+If this fails:
+.RS 4
+.IP 1. 3
+Launch Docker Desktop from Applications
+.IP 2.
+Wait for the Docker icon (whale) to stabilize in menu bar
+.IP 3.
+Verify again with
+.B docker info
+.RE
+.SS Verify Installation
+.PP
+.in +4n
+.EX
+# Check script is in PATH
+which ngspice-docker
+
+# Should display:
+# /path/to/ihp-macos-toolkit/scripts/ngspice-docker
+
+# Test Docker connectivity
+docker run --rm hello-world
+.EE
+.in
+.SH OPTIONS
+.TP
+.B \-b
+Batch mode. Run netlist without interactive shell.
+.TP
+.BI \-o " logfile"
+Write output to
+.IR logfile .
+Path translation is automatic.
+.TP
+.I netlist.sp
+SPICE netlist to simulate. Can use absolute or relative paths.
+.SH EXAMPLES
+.SS Basic Simulation
+.PP
+.in +4n
+.EX
+ngspice-docker circuit.sp
+.EE
+.in
+.SS Batch Mode with Log
+.PP
+.in +4n
+.EX
+ngspice-docker -b -o results.log amplifier.sp
+.EE
+.in
+.SS Using PDK Models
+.PP
+.in +4n
+.EX
+# In your netlist:
+.include /pdk/ihp-sg13g2/libs.tech/ngspice/models/cornerMOSlv.lib
+
+# Run normally
+ngspice-docker -b my_design.sp
+.EE
+.in
+.PP
+The
+.B /pdk
+path is automatically mounted from $PDK_ROOT.
+.SH AUTOMATIC PATH TRANSLATION
+The wrapper automatically translates macOS paths to Docker container paths:
+.PP
+.TS
+tab(|);
+l l.
+macOS Path|Container Path
+_
+$PDK_ROOT|/pdk
+$(pwd)|/work
+T{
+.na
+Any file in current directory or subdirectories
+T}|T{
+.na
+Accessible in /work
+T}
+.TE
+.PP
+You can use both macOS paths (in your shell) and container paths (in netlists).
+.SH TROUBLESHOOTING
+.SS Command not found
+.PP
+.in +4n
+.EX
+# Check PATH
+echo $PATH | grep toolkit
+
+# If missing, reload environment
+source $ASIC_DESIGN_ROOT/projets/env/zshrc_elec
+.EE
+.in
+.SS Docker connection refused
+.PP
+.RS 4
+.IP 1. 3
+Launch Docker Desktop
+.IP 2.
+Wait for icon to become stable (not animated)
+.IP 3.
+Verify:
+.B docker ps
+.RE
+.SS Permission denied
+.PP
+Ensure Docker Desktop has necessary permissions in System Preferences > Privacy & Security.
+.SS Model files not found
+.PP
+.in +4n
+.EX
+# Verify PDK_ROOT is set
+echo $PDK_ROOT
+
+# Should point to IHP-Open-PDK installation
+# Check models exist
+ls $PDK_ROOT/ihp-sg13g2/libs.tech/ngspice/models/
+.EE
+.in
+.SS Simulation hangs
+.PP
+.RS 4
+.IP \(bu 2
+Check Docker has sufficient resources (Preferences > Resources)
+.IP \(bu 2
+Verify netlist syntax with native ngspice first (if available)
+.IP \(bu 2
+Check Docker logs:
+.B docker logs
+.RE
+.SH FILES
+.TP
+.I $TOOLKIT_ROOT/scripts/ngspice-docker
+The wrapper script
+.TP
+.I $ASIC_DESIGN_ROOT/projets/env/zshrc_elec
+Environment configuration file
+.TP
+.I $PDK_ROOT/ihp-sg13g2/libs.tech/ngspice/
+SPICE models and libraries
+.SH ENVIRONMENT
+.TP
+.B TOOLKIT_ROOT
+Path to ihp-macos-toolkit installation
+.TP
+.B PDK_ROOT
+Path to IHP-Open-PDK installation
+.TP
+.B PDK
+PDK name (should be "ihp-sg13g2")
+.TP
+.B TMPDIR
+Temporary directory for intermediate files (optional, defaults to /tmp)
+.SH SEE ALSO
+.BR ngspice (1),
+.BR docker (1)
+.PP
+.B IHP SG13G2 Documentation:
+.br
+https://ihp-open-pdk-docs.readthedocs.io/
+.PP
+.B Toolkit Documentation:
+.br
+$TOOLKIT_ROOT/docs/
+.SH DIAGNOSTICS
+For detailed diagnosis of ngspice installations and configuration:
+.PP
+.in +4n
+.EX
+diagnose_ngspice.sh
+.EE
+.in
+.SH BUGS
+Report bugs to: https://github.com/YOUR-USERNAME/ihp-macos-toolkit/issues
+.SH AUTHORS
+Part of the ihp-macos-toolkit project.
+.SH COPYRIGHT
+See LICENSE file in the toolkit distribution.

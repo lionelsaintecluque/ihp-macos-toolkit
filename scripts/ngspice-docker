@@ -1,0 +1,15 @@
+#!/bin/bash
+# ngspice-docker - Run ngspice in Docker with IHP PDK mounted
+# Part of ihp-macos-toolkit
+
+if [ -z "$PDK_ROOT" ]; then
+    echo "Error: PDK_ROOT not set"
+    echo "Usage: export PDK_ROOT=/path/to/IHP-Open-PDK"
+    exit 1
+fi
+
+docker run --rm \
+    -v "$(pwd)":/work \
+    -v "$PDK_ROOT:/pdk" \
+    -w /work \
+    hpretl/iic-osic-tools:latest --skip ngspice "$@"
