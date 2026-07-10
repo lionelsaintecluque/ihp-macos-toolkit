@@ -1,0 +1,5 @@
+tmp*.sp
+tmp/
+results/
+results_nmos/
+resultus_pmos/
